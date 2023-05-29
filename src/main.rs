@@ -1,5 +1,12 @@
+use rand::prelude::{thread_rng, Distribution};
+use rand_distr::Normal;
+
 fn main() {
     println!("Hello, world!");
+
+    let mut rng = thread_rng();
+    let dist = Normal::<f32>::new(0.0, 1.0).unwrap();
+    println!("{}", dist.sample(&mut rng));
 
     let zeros = vec![vec![0.0; 10]; 10];
     let x: Vec<Vec<f32>> = zeros
