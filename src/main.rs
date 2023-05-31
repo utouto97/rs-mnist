@@ -1,8 +1,22 @@
+use std::fs::File;
+use std::io::Read;
+
 use rand::prelude::{thread_rng, Distribution};
 use rand_distr::Normal;
 
 fn main() {
     println!("Hello, world!");
+
+    let mut f = File::open("datasets/train-images-idx3-ubyte").unwrap();
+    let mut buf = Vec::new();
+    let _ = f.read_to_end(&mut buf).unwrap();
+    for i in 0..28 {
+        for j in 0..28 {
+            let k = i*28+j;
+            print!("{:?>03} ", &buf[k+16]);
+        }
+        println!()
+    }
 
     let zeros = vec![vec![0.0; 10]; 1];
     let x: Vec<Vec<f32>> = zeros
