@@ -14,7 +14,6 @@ fn main() {
     let mut dense = Dense::new(10, 20, 0.1);
     initialize_matrix(&mut dense.weights);
     let mut relu = Relu::new();
-
     let x2 = dense.forward(&x);
     for i in &x2 {
         for j in i {
@@ -23,7 +22,16 @@ fn main() {
         println!()
     }
     let y = relu.forward(&x2);
-    for i in y {
+    for i in &y {
+        for j in i {
+            print!("{} ", j)
+        }
+        println!()
+    }
+    let loss = softmax_cross_entropy(&x2, 0);
+    println!("loss: {}", loss);
+    let grads0 = grad_softmax_cross_entropy(&x2, 0);
+    for i in &grads0 {
         for j in i {
             print!("{} ", j)
         }
@@ -43,6 +51,18 @@ fn main() {
         }
         println!()
     }
+}
+
+fn softmax_cross_entropy(x: &Matrix, t: usize) -> f32 {
+    let sum = x[0].iter().fold(0.0, |acc, e| acc + e.exp());
+    -(x[0][t].exp() / sum).log(1.0_f32.exp())
+}
+
+fn grad_softmax_cross_entropy(x: &Matrix, t: usize) -> Matrix {
+    let sum = x[0].iter().fold(0.0, |acc, e| acc + e.exp());
+    let mut softmax = x[0].iter().map(|e| e.exp() / sum).collect::<Vec<_>>();
+    softmax[t] -= 1.0;
+    vec![softmax; 1]
 }
 
 type Matrix = Vec<Vec<f32>>;
