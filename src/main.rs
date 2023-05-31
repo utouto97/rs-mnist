@@ -4,12 +4,23 @@ use std::io::Read;
 use rand::prelude::{thread_rng, Distribution};
 use rand_distr::Normal;
 
+fn loadfile(fname: &str) -> Vec<u8> {
+    let mut f = File::open(fname).unwrap();
+    let mut buf = Vec::new();
+    let _ = f.read_to_end(&mut buf).unwrap();
+    buf
+}
+
+fn load_train_datasets() -> (Vec<u8>, Vec<u8>) {
+    let images = loadfile("datasets/train-images-idx3-ubyte");
+    let labels = loadfile("datasets/train-labels-idx1-ubyte");
+    (images, labels)
+}
+
 fn main() {
     println!("Hello, world!");
 
-    let mut f = File::open("datasets/train-images-idx3-ubyte").unwrap();
-    let mut buf = Vec::new();
-    let _ = f.read_to_end(&mut buf).unwrap();
+    let (buf, buf2) = load_train_datasets();
     for i in 0..28 {
         for j in 0..28 {
             let k = i*28+j;
@@ -17,6 +28,7 @@ fn main() {
         }
         println!()
     }
+    println!("{}", buf2[8]);
 
     let zeros = vec![vec![0.0; 10]; 1];
     let x: Vec<Vec<f32>> = zeros
