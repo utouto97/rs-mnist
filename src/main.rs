@@ -3,44 +3,38 @@ use std::io::Read;
 
 use rand::{
     prelude::{thread_rng, Distribution},
-    seq::SliceRandom,
     Rng,
 };
 use rand_distr::Normal;
 
 fn main() {
-    const LR: f32 = 0.1;
+    const LR: f32 = 0.01;
+    const BATCH_SIZE: usize = 250;
+    let mut network = Network::new();
+    network.add_layer(Box::new(Dense::new(28 * 28, 100, LR)));
+    network.add_layer(Box::new(Sigmoid::new()));
+    network.add_layer(Box::new(Dense::new(100, 200, LR)));
+    network.add_layer(Box::new(Sigmoid::new()));
+    network.add_layer(Box::new(Dense::new(200, 10, LR)));
+
     let (mut x_train, mut y_train) = load_train_datasets();
     shuffle(&mut x_train, &mut y_train);
-    for (x, y) in BatchIter::new(&x_train, &y_train, 250) {
-        println!("x {} {} ", x.len(), x[0].len());
-        println!("y {}", y.len());
+    for (i, (x, y)) in BatchIter::new(&x_train, &y_train, BATCH_SIZE).enumerate() {
+        println!(
+            "Batch {} / {} with size {}",
+            i,
+            y_train.len() / BATCH_SIZE,
+            BATCH_SIZE
+        );
 
-        let mut network = Network::new();
-        network.add_layer(Box::new(Dense::new(28 * 28, 10, LR)));
-        // network.add_layer(Box::new(Sigmoid::new()));
-        // network.add_layer(Box::new(Dense::new(100, 200, LR)));
-        // network.add_layer(Box::new(Sigmoid::new()));
-        // network.add_layer(Box::new(Dense::new(200, 10, LR)));
+        let out = network.forward(&x);
+        let loss = softmax_cross_entropy(&out, &y);
+        let gy = grad_softmax_cross_entropy(&out, &y);
+        network.backward(&gy);
 
-        let y = network.forward(&x);
-        // for (idx, o) in network.outputs.into_iter().enumerate() {
-        //     for i in &o {
-        //         for j in i {
-        //             if idx == 0 {
-        //                 print!("{:>02.0} ", j * 10.0);
-        //             } else {
-        //                 print!("{} ", j);
-        //             }
-        //         }
-        //         println!();
-        //     }
-        //     println!();
-        // }
-        let loss = softmax_cross_entropy(&y, y_train[0]);
-        println!("loss {}", loss);
-        println!("predict {}", argmax(&y));
-        break;
+        // println!("{:?}", y[0]);
+        // println!("{:?}", gy[0]);
+        println!("loss {:4.8}", loss);
     }
 }
 
@@ -108,13 +102,20 @@ impl Network {
     }
 
     fn forward(&mut self, x: &Matrix) -> Matrix {
-        println!("---");
         self.outputs.push(x.to_vec());
         for layer in &self.layers {
             let nx = &layer.forward(&self.outputs.last().unwrap());
             self.outputs.push(nx.to_vec());
         }
         self.outputs.last().unwrap().to_vec()
+    }
+
+    fn backward(&mut self, g: &Matrix) {
+        let n = self.layers.len();
+        let mut gs = vec![g.clone()];
+        for i in (0..n).rev() {
+            gs.push(self.layers[i].backward(&self.outputs[i], gs.last().unwrap()));
+        }
     }
 }
 
@@ -146,28 +147,27 @@ fn load_train_datasets() -> (Matrix, Vec<usize>) {
     (images, labels)
 }
 
-fn argmax(x: &Matrix) -> usize {
-    let mut res = 0;
-    let mut max = x[0][0];
-    for i in 1..x[0].len() {
-        if max < x[0][i] {
-            res = i;
-            max = x[0][i];
-        }
-    }
-    res
+fn softmax_cross_entropy(x: &Matrix, t: &Vec<usize>) -> f32 {
+    x.iter()
+        .zip(t.into_iter())
+        .map(|(x, t)| {
+            let sum = x.iter().fold(0.0, |acc, e| acc + e.exp());
+            -(x[*t].exp() / sum).log(1.0_f32.exp())
+        })
+        .fold(0.0, |acc, e| acc + e)
 }
 
-fn softmax_cross_entropy(x: &Matrix, t: usize) -> f32 {
-    let sum = x[0].iter().fold(0.0, |acc, e| acc + e.exp());
-    -(x[0][t].exp() / sum).log(1.0_f32.exp())
-}
-
-fn grad_softmax_cross_entropy(x: &Matrix, t: usize) -> Matrix {
-    let sum = x[0].iter().fold(0.0, |acc, e| acc + e.exp());
-    let mut softmax = x[0].iter().map(|e| e.exp() / sum).collect::<Vec<_>>();
-    softmax[t] -= 1.0;
-    vec![softmax; 1]
+fn grad_softmax_cross_entropy(x: &Matrix, t: &Vec<usize>) -> Matrix {
+    let n = t.len() as f32;
+    x.iter()
+        .zip(t.into_iter())
+        .map(|(x, t)| {
+            let sum = x.iter().fold(0.0, |acc, e| acc + e.exp());
+            let mut softmax = x.iter().map(|e| e.exp() / sum / n).collect::<Vec<_>>();
+            softmax[*t] -= 1.0 / n;
+            softmax
+        })
+        .collect()
 }
 
 type Matrix = Vec<Vec<f32>>;
@@ -193,10 +193,9 @@ fn scalar(x: &Matrix, k: f32) -> Matrix {
         .collect()
 }
 
-fn matadd(x: &Matrix, y: &Matrix) -> Matrix {
+fn addbias(x: &Matrix, y: &Matrix) -> Matrix {
     x.iter()
-        .zip(y.iter())
-        .map(|(xs, ys)| xs.iter().zip(ys.iter()).map(|(x, y)| x + y).collect())
+        .map(|xs| xs.iter().zip(y[0].iter()).map(|(x, y)| x + y).collect())
         .collect()
 }
 
@@ -231,8 +230,6 @@ fn transpose(x: &Matrix) -> Matrix {
 
 struct Dense {
     lr: f32,
-    n_inputs: usize,
-    n_outputs: usize,
     weights: Matrix,
     bias: Matrix,
 }
@@ -242,19 +239,13 @@ impl Dense {
         let mut weights = vec![vec![0.0; n_outputs]; n_inputs];
         initialize_matrix(&mut weights);
         let bias = vec![vec![0.0; n_outputs]; 1];
-        Self {
-            n_inputs,
-            n_outputs,
-            lr,
-            weights,
-            bias,
-        }
+        Self { lr, weights, bias }
     }
 }
 
 impl Layer for Dense {
     fn forward(&self, x: &Matrix) -> Matrix {
-        matadd(&matmul(&x, &self.weights), &self.bias)
+        addbias(&matmul(&x, &self.weights), &self.bias)
     }
 
     fn backward(&mut self, x: &Matrix, grad_output: &Matrix) -> Matrix {
@@ -269,38 +260,10 @@ impl Layer for Dense {
             })
             .collect();
 
-        self.weights = matadd(&self.weights, &scalar(&grad_weights, -self.lr));
-        self.bias = matadd(&self.bias, &scalar(&grad_bias, -self.lr));
+        self.weights = addbias(&self.weights, &scalar(&grad_weights, -self.lr));
+        self.bias = addbias(&self.bias, &scalar(&grad_bias, -self.lr));
 
         grad_input
-    }
-}
-
-struct Relu {}
-
-impl Relu {
-    fn new() -> Self {
-        Self {}
-    }
-}
-
-impl Layer for Relu {
-    fn forward(&self, x: &Matrix) -> Matrix {
-        x.iter()
-            .map(|v| v.iter().map(|e| if *e < 0.0 { 0.0 } else { *e }).collect())
-            .collect()
-    }
-
-    fn backward(&mut self, x: &Matrix, grad_output: &Matrix) -> Matrix {
-        x.iter()
-            .zip(grad_output.iter())
-            .map(|(xs, gs)| {
-                xs.iter()
-                    .zip(gs.iter())
-                    .map(|(x, g)| if *x < 0.0 { 0.0 } else { *g })
-                    .collect()
-            })
-            .collect()
     }
 }
 
