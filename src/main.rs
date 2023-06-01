@@ -4,77 +4,77 @@ use std::io::Read;
 use rand::{
     prelude::{thread_rng, Distribution},
     seq::SliceRandom,
+    Rng,
 };
 use rand_distr::Normal;
 
 fn main() {
     const LR: f32 = 0.1;
-    let (x_train, y_train) = load_train_datasets();
-    for (x, y) in BatchIter::new(&x_train, &y_train, 250, true) {
-        println!("x {} {} {} ", x.len(), x[0].len(), x[0][0].len());
+    let (mut x_train, mut y_train) = load_train_datasets();
+    shuffle(&mut x_train, &mut y_train);
+    for (x, y) in BatchIter::new(&x_train, &y_train, 250) {
+        println!("x {} {} ", x.len(), x[0].len());
         println!("y {}", y.len());
+
+        let mut network = Network::new();
+        network.add_layer(Box::new(Dense::new(28 * 28, 10, LR)));
+        // network.add_layer(Box::new(Sigmoid::new()));
+        // network.add_layer(Box::new(Dense::new(100, 200, LR)));
+        // network.add_layer(Box::new(Sigmoid::new()));
+        // network.add_layer(Box::new(Dense::new(200, 10, LR)));
+
+        let y = network.forward(&x);
+        // for (idx, o) in network.outputs.into_iter().enumerate() {
+        //     for i in &o {
+        //         for j in i {
+        //             if idx == 0 {
+        //                 print!("{:>02.0} ", j * 10.0);
+        //             } else {
+        //                 print!("{} ", j);
+        //             }
+        //         }
+        //         println!();
+        //     }
+        //     println!();
+        // }
+        let loss = softmax_cross_entropy(&y, y_train[0]);
+        println!("loss {}", loss);
+        println!("predict {}", argmax(&y));
         break;
     }
+}
 
-    let mut network = Network::new();
-    network.add_layer(Box::new(Dense::new(28 * 28, 100, LR)));
-    network.add_layer(Box::new(Sigmoid::new()));
-    network.add_layer(Box::new(Dense::new(100, 200, LR)));
-    network.add_layer(Box::new(Sigmoid::new()));
-    network.add_layer(Box::new(Dense::new(200, 10, LR)));
-
-    let y = network.forward(&x_train[0]);
-    for (idx, o) in network.outputs.into_iter().enumerate() {
-        for i in &o {
-            for j in i {
-                if idx == 0 {
-                    print!("{:>02.0} ", j * 10.0);
-                } else {
-                    print!("{} ", j);
-                }
-            }
-            println!();
-        }
-        println!();
+fn shuffle(images: &mut Matrix, labels: &mut Vec<usize>) {
+    let mut rng = rand::thread_rng();
+    for i in 0..labels.len() {
+        let j = rng.gen_range(0..labels.len());
+        let tmp = images[i].clone();
+        images[i] = images[j].clone();
+        images[j] = tmp.to_vec();
     }
-    let loss = softmax_cross_entropy(&y, y_train[0]);
-    println!("loss {}", loss);
-    println!("predict {}", argmax(&y));
 }
 
 struct BatchIter<'a> {
-    images: &'a Vec<Matrix>,
+    images: &'a Matrix,
     labels: &'a Vec<usize>,
     batch_size: usize,
     curr: usize,
-    indexes: Vec<usize>,
 }
 
 impl<'a> BatchIter<'a> {
-    fn new(
-        images: &'a Vec<Matrix>,
-        labels: &'a Vec<usize>,
-        batch_size: usize,
-        shuffle: bool,
-    ) -> Self {
-        let mut indexes = (0..labels.len()).map(|e| e).collect::<Vec<_>>();
-        if shuffle {
-            let mut rng = rand::thread_rng();
-            indexes.shuffle(&mut rng);
-        }
+    fn new(images: &'a Matrix, labels: &'a Vec<usize>, batch_size: usize) -> Self {
         let curr = 0;
         Self {
             images,
             labels,
             batch_size,
             curr,
-            indexes,
         }
     }
 }
 
 impl<'a> Iterator for BatchIter<'a> {
-    type Item = (Vec<&'a Matrix>, Vec<&'a usize>);
+    type Item = (Matrix, Vec<usize>);
 
     fn next(&mut self) -> Option<Self::Item> {
         let start = self.curr;
@@ -82,16 +82,11 @@ impl<'a> Iterator for BatchIter<'a> {
         if end > self.labels.len() {
             return None;
         }
-
         self.curr = end;
-        let mut images: Vec<&'a Matrix> = vec![];
-        let mut labels: Vec<&'a usize> = vec![];
-        self.indexes[start..end].into_iter().for_each(|e| {
-            images.push(&self.images[*e]);
-            labels.push(&self.labels[*e]);
-        });
-
-        Some((images, labels))
+        Some((
+            self.images[start..end].to_vec(),
+            self.labels[start..end].to_vec(),
+        ))
     }
 }
 
@@ -113,10 +108,11 @@ impl Network {
     }
 
     fn forward(&mut self, x: &Matrix) -> Matrix {
+        println!("---");
         self.outputs.push(x.to_vec());
         for layer in &self.layers {
             let nx = &layer.forward(&self.outputs.last().unwrap());
-            self.outputs.push(nx.to_vec())
+            self.outputs.push(nx.to_vec());
         }
         self.outputs.last().unwrap().to_vec()
     }
@@ -129,7 +125,7 @@ fn loadfile(fname: &str) -> Vec<u8> {
     buf
 }
 
-fn load_train_datasets() -> (Vec<Matrix>, Vec<usize>) {
+fn load_train_datasets() -> (Matrix, Vec<usize>) {
     let images_u8 = loadfile("datasets/train-images-idx3-ubyte")[16..].to_vec();
     let labels_u8 = loadfile("datasets/train-labels-idx1-ubyte")[8..].to_vec();
 
@@ -138,16 +134,10 @@ fn load_train_datasets() -> (Vec<Matrix>, Vec<usize>) {
         .map(|e| ((e as f32) - 127.0) / 255.0)
         .collect::<Vec<_>>();
     let n = normalized_images.len() / (28 * 28);
-    let mut images: Vec<Matrix> = vec![];
+    let mut images: Matrix = vec![];
     for k in 0..n {
-        let mut m = vec![vec![0.0; 28]; 28];
         let base = k * 28 * 28;
-        for i in 0..28 {
-            for j in 0..28 {
-                m[i][j] = normalized_images[base + i * 28 + j];
-            }
-        }
-        images.push(m);
+        images.push(normalized_images[base..(base + 28 * 28)].to_vec());
     }
     let labels = labels_u8
         .into_iter()
