@@ -4,6 +4,57 @@ use std::io::Read;
 use rand::prelude::{thread_rng, Distribution};
 use rand_distr::Normal;
 
+fn main() {
+    const LR: f32 = 0.1;
+    let (x_train, y_train) = load_train_datasets();
+
+    let mut network = Network::new();
+    network.add_layer(Box::new(Dense::new(28*28, 100, LR)));
+    network.add_layer(Box::new(Sigmoid::new()));
+    network.add_layer(Box::new(Dense::new(100, 200, LR)));
+    network.add_layer(Box::new(Sigmoid::new()));
+    network.add_layer(Box::new(Dense::new(200, 10, LR)));
+
+    let y = network.forward(&x_train[0]);
+    for o in network.outputs {
+        for i in &o {
+            for j in i {
+                print!("{} ", j);
+            }
+            println!();
+        }
+        println!();
+    }
+    let loss = softmax_cross_entropy(&y, y_train[0]);
+    println!("loss {}", loss);
+    println!("predit {}", argmax(&y));
+}
+
+struct Network
+{
+    layers: Vec<Box<dyn Layer>>,
+    outputs: Vec<Matrix>,
+}
+
+impl Network {
+    fn new() -> Self {
+        Self { layers: vec![], outputs: vec![] }
+    }
+
+    fn add_layer(&mut self, layer: Box<dyn Layer>) {
+        self.layers.push(layer)
+    }
+
+    fn forward(&mut self, x: &Matrix) -> Matrix {
+        self.outputs.push(x.to_vec());
+        for layer in &self.layers {
+           let nx = &layer.forward(&self.outputs.last().unwrap());
+            self.outputs.push(nx.to_vec())
+        }
+        self.outputs.last().unwrap().to_vec()
+    }
+}
+
 fn loadfile(fname: &str) -> Vec<u8> {
     let mut f = File::open(fname).unwrap();
     let mut buf = Vec::new();
@@ -11,72 +62,37 @@ fn loadfile(fname: &str) -> Vec<u8> {
     buf
 }
 
-fn load_train_datasets() -> (Vec<u8>, Vec<u8>) {
-    let images = loadfile("datasets/train-images-idx3-ubyte");
-    let labels = loadfile("datasets/train-labels-idx1-ubyte");
-    (images, labels)
+fn load_train_datasets() -> (Vec<Matrix>, Vec<usize>) {
+    let images_u8 = loadfile("datasets/train-images-idx3-ubyte");
+    let labels_u8 = loadfile("datasets/train-labels-idx1-ubyte");
+
+    let normalized_images = images_u8.into_iter().map(|e| ((e as f32) - 127.0) / 255.0).collect::<Vec<_>>();
+    let mut images : Vec<Matrix> = vec![];
+    for k in 0..(normalized_images.len() / (28*28)) {
+        let mut m  = vec![vec![0.0; 28]; 28];
+        let base = k * 28 * 28;
+        for i in 0..28 {
+            for j in 0..28 {
+                m[i][j] = normalized_images[base + i*28 + j];
+            }
+        }
+        images.push(m);
+    }
+    let labels = labels_u8.into_iter().map(|e| e as usize).collect::<Vec<_>>();
+
+    (images[16..].to_vec(), labels[8..].to_vec())
 }
 
-fn main() {
-    println!("Hello, world!");
-
-    let (buf, buf2) = load_train_datasets();
-    for i in 0..28 {
-        for j in 0..28 {
-            let k = i*28+j;
-            print!("{:?>03} ", &buf[k+16]);
+fn argmax(x: &Matrix) -> usize {
+    let mut res = 0;
+    let mut max = x[0][0];
+    for i in 1..x[0].len() {
+        if max < x[0][i] {
+            res = i;
+            max = x[0][i];
         }
-        println!()
     }
-    println!("{}", buf2[8]);
-
-    let zeros = vec![vec![0.0; 10]; 1];
-    let x: Vec<Vec<f32>> = zeros
-        .iter()
-        .map(|v| v.iter().enumerate().map(|(i, _)| i as f32 - 5.0).collect())
-        .collect();
-
-    println!("{} {}", x.len(), x[0].len());
-    let mut dense = Dense::new(10, 20, 0.1);
-    initialize_matrix(&mut dense.weights);
-    let mut relu = Relu::new();
-    let x2 = dense.forward(&x);
-    for i in &x2 {
-        for j in i {
-            print!("{} ", j)
-        }
-        println!()
-    }
-    let y = relu.forward(&x2);
-    for i in &y {
-        for j in i {
-            print!("{} ", j)
-        }
-        println!()
-    }
-    let loss = softmax_cross_entropy(&x2, 0);
-    println!("loss: {}", loss);
-    let grads0 = grad_softmax_cross_entropy(&x2, 0);
-    for i in &grads0 {
-        for j in i {
-            print!("{} ", j)
-        }
-        println!()
-    }
-    let grads = relu.backward(&x2, &x.clone());
-    for i in &grads {
-        for j in i {
-            print!("{} ", j)
-        }
-        println!()
-    }
-    let grads2 = dense.backward(&x, &grads);
-    for i in grads2 {
-        for j in i {
-            print!("{} ", j)
-        }
-        println!()
-    }
+    res
 }
 
 fn softmax_cross_entropy(x: &Matrix, t: usize) -> f32 {
@@ -160,7 +176,8 @@ struct Dense {
 
 impl Dense {
     fn new(n_inputs: usize, n_outputs: usize, lr: f32) -> Self {
-        let weights = vec![vec![0.0; n_outputs]; n_inputs];
+        let mut weights = vec![vec![0.0; n_outputs]; n_inputs];
+        initialize_matrix(&mut weights);
         let bias = vec![vec![0.0; n_outputs]; 1];
         Self {
             n_inputs,
@@ -218,6 +235,37 @@ impl Layer for Relu {
                 xs.iter()
                     .zip(gs.iter())
                     .map(|(x, g)| if *x < 0.0 { 0.0 } else { *g })
+                    .collect()
+            })
+            .collect()
+    }
+}
+
+struct Sigmoid {}
+
+impl Sigmoid {
+    fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Layer for Sigmoid {
+    fn forward(&self, x: &Matrix) -> Matrix {
+        x.iter()
+            .map(|v| v.into_iter().map(|e| 1.0 / (1.0 + (-e).exp())).collect())
+            .collect()
+    }
+
+    fn backward(&mut self, x: &Matrix, grad_output: &Matrix) -> Matrix {
+        x.iter()
+            .zip(grad_output.iter())
+            .map(|(xs, gs)| {
+                xs.into_iter()
+                    .zip(gs.into_iter())
+                    .map(|(x, g)| {
+                        let fx = 1.0 / (1.0 + (-x).exp());
+                        g * fx * (1.0 - fx)
+                    })
                     .collect()
             })
             .collect()
