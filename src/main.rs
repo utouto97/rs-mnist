@@ -1,7 +1,10 @@
 use std::fs::File;
 use std::io::Read;
 
-use rand::{prelude::{thread_rng, Distribution}, seq::SliceRandom};
+use rand::{
+    prelude::{thread_rng, Distribution},
+    seq::SliceRandom,
+};
 use rand_distr::Normal;
 
 fn main() {
@@ -14,7 +17,7 @@ fn main() {
     }
 
     let mut network = Network::new();
-    network.add_layer(Box::new(Dense::new(28*28, 100, LR)));
+    network.add_layer(Box::new(Dense::new(28 * 28, 100, LR)));
     network.add_layer(Box::new(Sigmoid::new()));
     network.add_layer(Box::new(Dense::new(100, 200, LR)));
     network.add_layer(Box::new(Sigmoid::new()));
@@ -25,7 +28,7 @@ fn main() {
         for i in &o {
             for j in i {
                 if idx == 0 {
-                    print!("{:>02.0} ", j*10.0);
+                    print!("{:>02.0} ", j * 10.0);
                 } else {
                     print!("{} ", j);
                 }
@@ -48,14 +51,25 @@ struct BatchIter<'a> {
 }
 
 impl<'a> BatchIter<'a> {
-    fn new(images: &'a Vec<Matrix>, labels: &'a Vec<usize>, batch_size: usize, shuffle: bool) -> Self {
+    fn new(
+        images: &'a Vec<Matrix>,
+        labels: &'a Vec<usize>,
+        batch_size: usize,
+        shuffle: bool,
+    ) -> Self {
         let mut indexes = (0..labels.len()).map(|e| e).collect::<Vec<_>>();
         if shuffle {
             let mut rng = rand::thread_rng();
             indexes.shuffle(&mut rng);
         }
         let curr = 0;
-        Self { images, labels, batch_size, curr, indexes }
+        Self {
+            images,
+            labels,
+            batch_size,
+            curr,
+            indexes,
+        }
     }
 }
 
@@ -66,12 +80,12 @@ impl<'a> Iterator for BatchIter<'a> {
         let start = self.curr;
         let end = start + self.batch_size;
         if end > self.labels.len() {
-            return None
+            return None;
         }
 
         self.curr = end;
-        let mut images : Vec<&'a Matrix> = vec![];
-        let mut labels : Vec<&'a usize> = vec![];
+        let mut images: Vec<&'a Matrix> = vec![];
+        let mut labels: Vec<&'a usize> = vec![];
         self.indexes[start..end].into_iter().for_each(|e| {
             images.push(&self.images[*e]);
             labels.push(&self.labels[*e]);
@@ -81,15 +95,17 @@ impl<'a> Iterator for BatchIter<'a> {
     }
 }
 
-struct Network
-{
+struct Network {
     layers: Vec<Box<dyn Layer>>,
     outputs: Vec<Matrix>,
 }
 
 impl Network {
     fn new() -> Self {
-        Self { layers: vec![], outputs: vec![] }
+        Self {
+            layers: vec![],
+            outputs: vec![],
+        }
     }
 
     fn add_layer(&mut self, layer: Box<dyn Layer>) {
@@ -99,7 +115,7 @@ impl Network {
     fn forward(&mut self, x: &Matrix) -> Matrix {
         self.outputs.push(x.to_vec());
         for layer in &self.layers {
-           let nx = &layer.forward(&self.outputs.last().unwrap());
+            let nx = &layer.forward(&self.outputs.last().unwrap());
             self.outputs.push(nx.to_vec())
         }
         self.outputs.last().unwrap().to_vec()
@@ -117,20 +133,26 @@ fn load_train_datasets() -> (Vec<Matrix>, Vec<usize>) {
     let images_u8 = loadfile("datasets/train-images-idx3-ubyte")[16..].to_vec();
     let labels_u8 = loadfile("datasets/train-labels-idx1-ubyte")[8..].to_vec();
 
-    let normalized_images = images_u8.into_iter().map(|e| ((e as f32) - 127.0) / 255.0).collect::<Vec<_>>();
-    let n = normalized_images.len() / (28*28);
-    let mut images : Vec<Matrix> = vec![];
+    let normalized_images = images_u8
+        .into_iter()
+        .map(|e| ((e as f32) - 127.0) / 255.0)
+        .collect::<Vec<_>>();
+    let n = normalized_images.len() / (28 * 28);
+    let mut images: Vec<Matrix> = vec![];
     for k in 0..n {
         let mut m = vec![vec![0.0; 28]; 28];
         let base = k * 28 * 28;
         for i in 0..28 {
             for j in 0..28 {
-                m[i][j] = normalized_images[base + i*28 + j];
+                m[i][j] = normalized_images[base + i * 28 + j];
             }
         }
         images.push(m);
     }
-    let labels = labels_u8.into_iter().map(|e| (e as usize)).collect::<Vec<_>>();
+    let labels = labels_u8
+        .into_iter()
+        .map(|e| (e as usize))
+        .collect::<Vec<_>>();
     (images, labels)
 }
 
