@@ -1,8 +1,10 @@
-mod matrix;
 mod layer;
+mod matrix;
+mod relu;
 
-use crate::matrix::{addbias, argmax, matadd, matmul, scalar, transpose, Matrix};
 use crate::layer::Layer;
+use crate::matrix::{addbias, argmax, matadd, matmul, scalar, transpose, Matrix};
+use crate::relu::Relu;
 
 use std::fs::File;
 use std::io::Read;
@@ -327,38 +329,6 @@ impl Layer for Sigmoid {
                         let fx = self._sigmoid(*x);
                         g * fx * (1.0 - fx)
                     })
-                    .collect()
-            })
-            .collect()
-    }
-
-    fn save(&self) {}
-
-    fn load(&mut self) {}
-}
-
-struct Relu {}
-
-impl Relu {
-    fn new() -> Self {
-        Self {}
-    }
-}
-
-impl Layer for Relu {
-    fn forward(&self, x: &Matrix) -> Matrix {
-        x.iter()
-            .map(|v| v.iter().map(|e| if *e > 0.0 { *e } else { 0.0 }).collect())
-            .collect()
-    }
-
-    fn backward(&mut self, x: &Matrix, grad_output: &Matrix) -> Matrix {
-        x.iter()
-            .zip(grad_output.iter())
-            .map(|(x, g)| {
-                x.iter()
-                    .zip(g.iter())
-                    .map(|(x, g)| if *x > 0.0 { *g } else { 0.0 })
                     .collect()
             })
             .collect()
