@@ -9,19 +9,20 @@ use rand::{
 use rand_distr::Normal;
 
 fn main() {
-    const LR: f32 = 0.001;
+    const LR: f32 = 0.01;
     const BATCH_SIZE: usize = 5000;
     const EPOCHS: usize = 10;
 
     let mut network = Network::new();
     network.add_layer(Box::new(Dense::new(28 * 28, 100, LR, "0".to_string())));
     network.add_layer(Box::new(Relu::new()));
-    network.add_layer(Box::new(Dense::new(100, 200, LR, "1".to_string())));
-    network.add_layer(Box::new(Relu::new()));
-    network.add_layer(Box::new(Dense::new(200, 10, LR, "2".to_string())));
+    // network.add_layer(Box::new(Dense::new(100, 200, LR, "1".to_string())));
+    // network.add_layer(Box::new(Relu::new()));
+    network.add_layer(Box::new(Dense::new(100, 10, LR, "2".to_string())));
 
     let (mut x_train, mut y_train) = load_datasets(true);
     shuffle(&mut x_train, &mut y_train);
+    let (x_test, y_test) = load_datasets(false);
     for epoch in 0..EPOCHS {
         println!("{} / {}", epoch, EPOCHS);
         let iters = y_train.len() / BATCH_SIZE;
@@ -42,6 +43,13 @@ fn main() {
         println!();
         println!("loss {:4.4}", total_loss / iters as f32);
         println!("acc  {:4.4}", acc / iters as f32);
+
+        {
+            let out = network.forward(&x_test);
+            let preds = argmax(&out);
+            let acc = accuracy(&preds, &y_test);
+            println!("acc  {:4.4}", acc);
+        }
     }
 
     network.save();
@@ -180,16 +188,17 @@ fn loadfile(fname: &str) -> Vec<u8> {
 }
 
 fn load_datasets(train: bool) -> (Matrix, Vec<usize>) {
-    let images_u8;
-    let labels_u8;
-
-    if train {
-        images_u8 = loadfile("datasets/train-images-idx3-ubyte")[16..].to_vec();
-        labels_u8 = loadfile("datasets/train-labels-idx1-ubyte")[8..].to_vec();
+    let (images_u8, labels_u8) = if train {
+        (
+            loadfile("datasets/train-images-idx3-ubyte")[16..].to_vec(),
+            loadfile("datasets/train-labels-idx1-ubyte")[8..].to_vec(),
+        )
     } else {
-        images_u8 = loadfile("t10k-images-idx1-ubyte")[16..].to_vec();
-        labels_u8 = loadfile("t10k-labels-idx1-ubyte")[8..].to_vec();
-    }
+        (
+            loadfile("datasets/t10k-images-idx3-ubyte")[16..].to_vec(),
+            loadfile("datasets/t10k-labels-idx1-ubyte")[8..].to_vec(),
+        )
+    };
 
     let normalized_images = images_u8
         .into_iter()
@@ -221,12 +230,13 @@ fn softmax_cross_entropy(x: &Matrix, t: &Vec<usize>) -> f32 {
 }
 
 fn grad_softmax_cross_entropy(x: &Matrix, t: &Vec<usize>) -> Matrix {
+    let n = t.len() as f32;
     x.iter()
         .zip(t.into_iter())
         .map(|(x, t)| {
             let sum = x.iter().map(|e| e.exp()).sum::<f32>();
-            let mut softmax = x.iter().map(|e| e.exp() / sum).collect::<Vec<_>>();
-            softmax[*t] -= 1.0;
+            let mut softmax = x.iter().map(|e| e.exp() / sum / n).collect::<Vec<_>>();
+            softmax[*t] -= 1.0 / n;
             softmax
         })
         .collect()
