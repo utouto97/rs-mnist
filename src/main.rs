@@ -3,7 +3,9 @@ mod matrix;
 mod relu;
 
 use crate::layer::Layer;
-use crate::matrix::{addbias, argmax, matadd, matmul, scalar, transpose, Matrix};
+use crate::matrix::{
+    addbias, argmax, load_matrix, matadd, matmul, save_matrix, scalar, transpose, Matrix,
+};
 use crate::relu::Relu;
 
 use std::fs::File;
@@ -337,42 +339,4 @@ impl Layer for Sigmoid {
     fn save(&self) {}
 
     fn load(&mut self) {}
-}
-
-fn save_matrix(fname: &str, x: &Matrix) {
-    let mut file = File::create(fname).unwrap();
-    for row in x {
-        let bytes: &[u8] = unsafe {
-            std::slice::from_raw_parts(
-                row.as_ptr() as *const u8,
-                row.len() * std::mem::size_of::<f32>(),
-            )
-        };
-        file.write_all(bytes).unwrap();
-    }
-    file.flush().unwrap();
-}
-
-fn load_matrix(fname: &str, x: &mut Matrix) {
-    let file = File::open(fname).unwrap();
-    let metadata = file.metadata().unwrap();
-    let file_size = metadata.len();
-
-    let num_rows = (file_size / (std::mem::size_of::<f32>() as u64)) as usize;
-
-    let mut buffer = vec![0; num_rows * std::mem::size_of::<f32>()];
-
-    let mut file = file;
-    file.read_exact(&mut buffer).unwrap();
-
-    unsafe {
-        let ptr = buffer.as_ptr() as *const f32;
-        let slice = std::slice::from_raw_parts(ptr, num_rows);
-
-        for i in 0..x.len() {
-            for j in 0..x[i].len() {
-                x[i][j] = slice[i * x[i].len() + j];
-            }
-        }
-    }
 }
