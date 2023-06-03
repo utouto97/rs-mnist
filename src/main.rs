@@ -1,7 +1,9 @@
+mod dense;
 mod layer;
 mod matrix;
 mod relu;
 
+use crate::dense::Dense;
 use crate::layer::Layer;
 use crate::matrix::{
     addbias, argmax, load_matrix, matadd, matmul, save_matrix, scalar, transpose, Matrix,
@@ -12,11 +14,7 @@ use std::fs::File;
 use std::io::Read;
 use std::io::{stdout, Write};
 
-use rand::{
-    prelude::{thread_rng, Distribution},
-    Rng,
-};
-use rand_distr::Normal;
+use rand::Rng;
 
 fn main() {
     const LR: f32 = 0.01;
@@ -232,72 +230,4 @@ fn grad_softmax_cross_entropy(x: &Matrix, t: &Vec<usize>) -> Matrix {
             softmax
         })
         .collect()
-}
-
-fn initialize_matrix(x: &mut Matrix) {
-    let mut rng = thread_rng();
-    let dist = Normal::<f32>::new(0.0, 0.01).unwrap();
-    for i in 0..x.len() {
-        for j in 0..x[i].len() {
-            x[i][j] = dist.sample(&mut rng);
-        }
-    }
-}
-
-struct Dense {
-    lr: f32,
-    weights: Matrix,
-    bias: Matrix,
-    name: String,
-}
-
-impl Dense {
-    fn new(n_inputs: usize, n_outputs: usize, lr: f32, name: String) -> Self {
-        let mut weights = vec![vec![0.0; n_outputs]; n_inputs];
-        initialize_matrix(&mut weights);
-        let bias = vec![vec![0.0; n_outputs]; 1];
-        Self {
-            lr,
-            weights,
-            bias,
-            name,
-        }
-    }
-}
-
-impl Layer for Dense {
-    fn forward(&self, x: &Matrix) -> Matrix {
-        addbias(&matmul(&x, &self.weights), &self.bias)
-    }
-
-    fn backward(&mut self, x: &Matrix, grad_output: &Matrix) -> Matrix {
-        let grad_input = matmul(&grad_output, &transpose(&self.weights));
-
-        let grad_weights = matmul(&transpose(&x), &grad_output);
-        let grad_bias = vec![transpose(&grad_output)
-            .iter()
-            .map(|v| {
-                let sum = v.iter().fold(0.0, |acc, e| acc + e);
-                sum
-            })
-            .collect()];
-
-        self.weights = matadd(&self.weights, &scalar(&grad_weights, -self.lr));
-        self.bias = matadd(&self.bias, &scalar(&grad_bias, -self.lr));
-
-        grad_input
-    }
-
-    fn save(&self) {
-        save_matrix(&format!("params/{}.weights.bin", self.name), &self.weights);
-        save_matrix(&format!("params/{}.bias.bin", self.name), &self.bias);
-    }
-
-    fn load(&mut self) {
-        load_matrix(
-            &format!("params/{}.weights.bin", self.name),
-            &mut self.weights,
-        );
-        load_matrix(&format!("params/{}.bias.bin", self.name), &mut self.bias);
-    }
 }
