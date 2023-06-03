@@ -1,6 +1,7 @@
 mod dense;
 mod layer;
 mod matrix;
+mod network;
 mod relu;
 
 use crate::dense::Dense;
@@ -8,6 +9,7 @@ use crate::layer::Layer;
 use crate::matrix::{
     addbias, argmax, load_matrix, matadd, matmul, save_matrix, scalar, transpose, Matrix,
 };
+use crate::network::Network;
 use crate::relu::Relu;
 
 use std::fs::File;
@@ -119,54 +121,6 @@ impl<'a> Iterator for BatchIter<'a> {
             self.images[start..end].to_vec(),
             self.labels[start..end].to_vec(),
         ))
-    }
-}
-
-struct Network {
-    layers: Vec<Box<dyn Layer>>,
-    inputs: Vec<Matrix>,
-}
-
-impl Network {
-    fn new() -> Self {
-        Self {
-            layers: vec![],
-            inputs: vec![],
-        }
-    }
-
-    fn add_layer(&mut self, layer: Box<dyn Layer>) {
-        self.layers.push(layer)
-    }
-
-    fn forward(&mut self, x: &Matrix) -> Matrix {
-        self.inputs.clear();
-        self.inputs.push(x.clone());
-        for layer in &self.layers {
-            self.inputs
-                .push(layer.forward(&self.inputs.last().unwrap()));
-        }
-        self.inputs.last().unwrap().to_vec()
-    }
-
-    fn backward(&mut self, g: &Matrix) {
-        let n = self.layers.len();
-        let mut gs = vec![g.clone()];
-        for i in (0..n).rev() {
-            gs.push(self.layers[i].backward(&self.inputs[i], gs.last().unwrap()));
-        }
-    }
-
-    fn save(&self) {
-        for layer in &self.layers {
-            layer.save()
-        }
-    }
-
-    fn load(&mut self) {
-        for i in 0..self.layers.len() {
-            self.layers[i].load()
-        }
     }
 }
 
