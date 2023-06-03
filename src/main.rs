@@ -1,11 +1,13 @@
 mod dense;
 mod layer;
+mod loss;
 mod matrix;
 mod network;
 mod relu;
 
 use crate::dense::Dense;
 use crate::layer::Layer;
+use crate::loss::{grad_softmax_cross_entropy, softmax_cross_entropy};
 use crate::matrix::{
     addbias, argmax, load_matrix, matadd, matmul, save_matrix, scalar, transpose, Matrix,
 };
@@ -159,29 +161,4 @@ fn load_datasets(train: bool) -> (Matrix, Vec<usize>) {
         .map(|e| (e as usize))
         .collect::<Vec<_>>();
     (images, labels)
-}
-
-fn softmax_cross_entropy(x: &Matrix, t: &Vec<usize>) -> f32 {
-    let n = x.len() as f32;
-    x.iter()
-        .zip(t.into_iter())
-        .map(|(x, t)| {
-            let sum = x.iter().map(|e| e.exp()).sum::<f32>();
-            -(x[*t].exp() / sum).ln()
-        })
-        .sum::<f32>()
-        / n
-}
-
-fn grad_softmax_cross_entropy(x: &Matrix, t: &Vec<usize>) -> Matrix {
-    let n = t.len() as f32;
-    x.iter()
-        .zip(t.into_iter())
-        .map(|(x, t)| {
-            let sum = x.iter().map(|e| e.exp()).sum::<f32>();
-            let mut softmax = x.iter().map(|e| e.exp() / sum / n).collect::<Vec<_>>();
-            softmax[*t] -= 1.0 / n;
-            softmax
-        })
-        .collect()
 }
