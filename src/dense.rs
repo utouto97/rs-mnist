@@ -14,8 +14,8 @@ fn initialize_matrix(x: &mut Matrix) {
 
 pub struct Dense {
     lr: f32,
-    weights: Matrix,
-    bias: Matrix,
+    pub weights: Matrix,
+    pub bias: Matrix,
     name: String,
 }
 
@@ -44,10 +44,7 @@ impl Layer for Dense {
         let grad_weights = matmul(&transpose(&x), &grad_output);
         let grad_bias = vec![transpose(&grad_output)
             .iter()
-            .map(|v| {
-                let sum = v.iter().fold(0.0, |acc, e| acc + e);
-                sum
-            })
+            .map(|v| v.iter().sum())
             .collect()];
 
         self.weights = matadd(&self.weights, &scalar(&grad_weights, -self.lr));
