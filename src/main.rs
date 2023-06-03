@@ -14,11 +14,11 @@ fn main() {
     const EPOCHS: usize = 10;
 
     let mut network = Network::new();
-    network.add_layer(Box::new(Dense::new(28 * 28, 100, LR)));
+    network.add_layer(Box::new(Dense::new(28 * 28, 100, LR, "0".to_string())));
     network.add_layer(Box::new(Relu::new()));
-    network.add_layer(Box::new(Dense::new(100, 200, LR)));
+    network.add_layer(Box::new(Dense::new(100, 200, LR, "1".to_string())));
     network.add_layer(Box::new(Relu::new()));
-    network.add_layer(Box::new(Dense::new(200, 10, LR)));
+    network.add_layer(Box::new(Dense::new(200, 10, LR, "2".to_string())));
 
     let (mut x_train, mut y_train) = load_train_datasets();
     shuffle(&mut x_train, &mut y_train);
@@ -43,6 +43,8 @@ fn main() {
         println!("loss {:4.4}", total_loss / iters as f32);
         println!("acc  {:4.4}", acc / iters as f32);
     }
+
+    network.save();
 }
 
 fn argmax(x: &Matrix) -> Vec<usize> {
@@ -156,6 +158,18 @@ impl Network {
             gs.push(self.layers[i].backward(&self.inputs[i], gs.last().unwrap()));
         }
     }
+
+    fn save(&self) {
+        for layer in &self.layers {
+            layer.save()
+        }
+    }
+
+    fn load(&self) {
+        for layer in &self.layers {
+            layer.load()
+        }
+    }
 }
 
 fn loadfile(fname: &str) -> Vec<u8> {
@@ -225,6 +239,8 @@ fn initialize_matrix(x: &mut Matrix) {
 trait Layer {
     fn forward(&self, x: &Matrix) -> Matrix;
     fn backward(&mut self, x: &Matrix, grad_output: &Matrix) -> Matrix;
+    fn save(&self);
+    fn load(&self);
 }
 
 fn scalar(x: &Matrix, k: f32) -> Matrix {
@@ -284,14 +300,20 @@ struct Dense {
     lr: f32,
     weights: Matrix,
     bias: Matrix,
+    name: String,
 }
 
 impl Dense {
-    fn new(n_inputs: usize, n_outputs: usize, lr: f32) -> Self {
+    fn new(n_inputs: usize, n_outputs: usize, lr: f32, name: String) -> Self {
         let mut weights = vec![vec![0.0; n_outputs]; n_inputs];
         initialize_matrix(&mut weights);
         let bias = vec![vec![0.0; n_outputs]; 1];
-        Self { lr, weights, bias }
+        Self {
+            lr,
+            weights,
+            bias,
+            name,
+        }
     }
 }
 
@@ -316,6 +338,19 @@ impl Layer for Dense {
         self.bias = matadd(&self.bias, &scalar(&grad_bias, -self.lr));
 
         grad_input
+    }
+
+    fn save(&self) {
+        save_matrix(&format!("params/{}.weights.bin", self.name), &self.weights);
+        save_matrix(&format!("params/{}.bias.bin", self.name), &self.bias);
+    }
+
+    fn load(&self) {
+        load_matrix(
+            &format!("params/{}.weights.bin", self.name),
+            &mut self.weights,
+        );
+        load_matrix(&format!("params/{}.bias.bin", self.name), &mut self.bias);
     }
 }
 
@@ -352,6 +387,10 @@ impl Layer for Sigmoid {
             })
             .collect()
     }
+
+    fn save(&self) {}
+
+    fn load(&self) {}
 }
 
 struct Relu {}
@@ -379,5 +418,47 @@ impl Layer for Relu {
                     .collect()
             })
             .collect()
+    }
+
+    fn save(&self) {}
+
+    fn load(&self) {}
+}
+
+fn save_matrix(fname: &str, x: &Matrix) {
+    let mut file = File::create(fname).unwrap();
+    for row in x {
+        let bytes: &[u8] = unsafe {
+            std::slice::from_raw_parts(
+                row.as_ptr() as *const u8,
+                row.len() * std::mem::size_of::<f32>(),
+            )
+        };
+        file.write_all(bytes).unwrap();
+    }
+    file.flush().unwrap();
+}
+
+fn load_matrix(fname: &str, x: &mut Matrix) {
+    let file = File::open(fname).unwrap();
+    let metadata = file.metadata().unwrap();
+    let file_size = metadata.len();
+
+    let num_rows = (file_size / (std::mem::size_of::<f32>() as u64)) as usize;
+
+    let mut buffer = vec![0; num_rows * std::mem::size_of::<f32>()];
+
+    let mut file = file;
+    file.read_exact(&mut buffer).unwrap();
+
+    unsafe {
+        let ptr = buffer.as_ptr() as *const f32;
+        let slice = std::slice::from_raw_parts(ptr, num_rows);
+
+        for i in 0..x.len() {
+            for j in 0..x[i].len() {
+                x[i][j] = slice[i * x[i].len() + j];
+            }
+        }
     }
 }
