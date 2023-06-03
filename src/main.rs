@@ -20,7 +20,7 @@ fn main() {
     network.add_layer(Box::new(Relu::new()));
     network.add_layer(Box::new(Dense::new(200, 10, LR, "2".to_string())));
 
-    let (mut x_train, mut y_train) = load_train_datasets();
+    let (mut x_train, mut y_train) = load_datasets(true);
     shuffle(&mut x_train, &mut y_train);
     for epoch in 0..EPOCHS {
         println!("{} / {}", epoch, EPOCHS);
@@ -165,9 +165,9 @@ impl Network {
         }
     }
 
-    fn load(&self) {
-        for layer in &self.layers {
-            layer.load()
+    fn load(&mut self) {
+        for i in 0..self.layers.len() {
+            self.layers[i].load()
         }
     }
 }
@@ -179,9 +179,17 @@ fn loadfile(fname: &str) -> Vec<u8> {
     buf
 }
 
-fn load_train_datasets() -> (Matrix, Vec<usize>) {
-    let images_u8 = loadfile("datasets/train-images-idx3-ubyte")[16..].to_vec();
-    let labels_u8 = loadfile("datasets/train-labels-idx1-ubyte")[8..].to_vec();
+fn load_datasets(train: bool) -> (Matrix, Vec<usize>) {
+    let images_u8;
+    let labels_u8;
+
+    if train {
+        images_u8 = loadfile("datasets/train-images-idx3-ubyte")[16..].to_vec();
+        labels_u8 = loadfile("datasets/train-labels-idx1-ubyte")[8..].to_vec();
+    } else {
+        images_u8 = loadfile("t10k-images-idx1-ubyte")[16..].to_vec();
+        labels_u8 = loadfile("t10k-labels-idx1-ubyte")[8..].to_vec();
+    }
 
     let normalized_images = images_u8
         .into_iter()
@@ -240,7 +248,7 @@ trait Layer {
     fn forward(&self, x: &Matrix) -> Matrix;
     fn backward(&mut self, x: &Matrix, grad_output: &Matrix) -> Matrix;
     fn save(&self);
-    fn load(&self);
+    fn load(&mut self);
 }
 
 fn scalar(x: &Matrix, k: f32) -> Matrix {
@@ -345,7 +353,7 @@ impl Layer for Dense {
         save_matrix(&format!("params/{}.bias.bin", self.name), &self.bias);
     }
 
-    fn load(&self) {
+    fn load(&mut self) {
         load_matrix(
             &format!("params/{}.weights.bin", self.name),
             &mut self.weights,
@@ -390,7 +398,7 @@ impl Layer for Sigmoid {
 
     fn save(&self) {}
 
-    fn load(&self) {}
+    fn load(&mut self) {}
 }
 
 struct Relu {}
@@ -422,7 +430,7 @@ impl Layer for Relu {
 
     fn save(&self) {}
 
-    fn load(&self) {}
+    fn load(&mut self) {}
 }
 
 fn save_matrix(fname: &str, x: &Matrix) {
