@@ -1,6 +1,8 @@
 mod matrix;
+mod layer;
 
 use crate::matrix::{addbias, argmax, matadd, matmul, scalar, transpose, Matrix};
+use crate::layer::Layer;
 
 use std::fs::File;
 use std::io::Read;
@@ -236,13 +238,6 @@ fn initialize_matrix(x: &mut Matrix) {
             x[i][j] = dist.sample(&mut rng);
         }
     }
-}
-
-trait Layer {
-    fn forward(&self, x: &Matrix) -> Matrix;
-    fn backward(&mut self, x: &Matrix, grad_output: &Matrix) -> Matrix;
-    fn save(&self);
-    fn load(&mut self);
 }
 
 struct Dense {
