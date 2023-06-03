@@ -1,3 +1,7 @@
+mod matrix;
+
+use crate::matrix::{addbias, argmax, matadd, matmul, scalar, transpose, Matrix};
+
 use std::fs::File;
 use std::io::Read;
 use std::io::{stdout, Write};
@@ -53,24 +57,6 @@ fn main() {
     }
 
     network.save();
-}
-
-fn argmax(x: &Matrix) -> Vec<usize> {
-    x.iter()
-        .map(|v| {
-            let (i, _) = v
-                .iter()
-                .enumerate()
-                .fold((0, f32::MIN), |(maxi, maxv), (i, v)| {
-                    if maxv < *v {
-                        (i, *v)
-                    } else {
-                        (maxi, maxv)
-                    }
-                });
-            i
-        })
-        .collect()
 }
 
 fn accuracy(pred: &Vec<usize>, t: &Vec<usize>) -> f32 {
@@ -242,8 +228,6 @@ fn grad_softmax_cross_entropy(x: &Matrix, t: &Vec<usize>) -> Matrix {
         .collect()
 }
 
-type Matrix = Vec<Vec<f32>>;
-
 fn initialize_matrix(x: &mut Matrix) {
     let mut rng = thread_rng();
     let dist = Normal::<f32>::new(0.0, 0.01).unwrap();
@@ -259,59 +243,6 @@ trait Layer {
     fn backward(&mut self, x: &Matrix, grad_output: &Matrix) -> Matrix;
     fn save(&self);
     fn load(&mut self);
-}
-
-fn scalar(x: &Matrix, k: f32) -> Matrix {
-    x.iter()
-        .map(|v| v.iter().map(|e| e * k).collect())
-        .collect()
-}
-
-fn addbias(x: &Matrix, y: &Matrix) -> Matrix {
-    x.iter()
-        .map(|xs| xs.iter().zip(y[0].iter()).map(|(x, y)| x + y).collect())
-        .collect()
-}
-
-fn matadd(x: &Matrix, y: &Matrix) -> Matrix {
-    x.into_iter()
-        .zip(y.into_iter())
-        .map(|(xs, ys)| {
-            xs.into_iter()
-                .zip(ys.into_iter())
-                .map(|(x, y)| x + y)
-                .collect()
-        })
-        .collect()
-}
-
-fn matmul(x: &Matrix, y: &Matrix) -> Matrix {
-    let r = x.len();
-    let k = x[0].len();
-    let c = y[0].len();
-    let mut result = vec![vec![0.0; c]; r];
-    for i in 0..r {
-        for j in 0..c {
-            let mut sum = 0.0;
-            for kk in 0..k {
-                sum += x[i][kk] * y[kk][j];
-            }
-            result[i][j] = sum;
-        }
-    }
-    result
-}
-
-fn transpose(x: &Matrix) -> Matrix {
-    let r = x.len();
-    let c = x[0].len();
-    let mut result = vec![vec![0.0; r]; c];
-    for i in 0..r {
-        for j in 0..c {
-            result[j][i] = x[i][j];
-        }
-    }
-    result
 }
 
 struct Dense {
