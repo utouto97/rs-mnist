@@ -7,8 +7,8 @@
   <body>
     <canvas
       id="cnvs"
-      width="400px"
-      height="400px"
+      width="420"
+      height="420"
       style="border: 1px solid #000000"
     ></canvas>
     <button id="send">send</button>
@@ -50,49 +50,35 @@
           canvas.height
         );
 
-        const resizedImageData = new ImageData(28, 28);
-        const scaleWidth = imageData.width / resizedImageData.width;
-        const scaleHeight = imageData.height / resizedImageData.height;
+        const resizedImage = new Float32Array(28 * 28);
+        const scaleWidth = imageData.width / 28;
+        const scaleHeight = imageData.height / 28;
 
-        for (let y = 0; y < resizedImageData.height; y++) {
-          for (let x = 0; x < resizedImageData.width; x++) {
+        for (let y = 0; y < 28; y++) {
+          for (let x = 0; x < 28; x++) {
             const startX = Math.floor(x * scaleWidth);
             const startY = Math.floor(y * scaleHeight);
             const endX = Math.floor((x + 1) * scaleWidth);
             const endY = Math.floor((y + 1) * scaleHeight);
 
             let maxGray = 0;
-
             for (let j = startY; j < endY; j++) {
               for (let i = startX; i < endX; i++) {
                 const index = (j * imageData.width + i) * 4;
                 const gray = imageData.data[index + 3];
-
                 if (gray > maxGray) {
                   maxGray = gray;
                 }
               }
             }
 
-            const resizedIndex = (y * resizedImageData.width + x) * 4;
-            resizedImageData.data[resizedIndex] = 0;
-            resizedImageData.data[resizedIndex + 1] = 0;
-            resizedImageData.data[resizedIndex + 2] = 0;
-            resizedImageData.data[resizedIndex + 3] = maxGray;
+            const resizedIndex = y * 28 + x;
+            resizedImage[resizedIndex] = maxGray;
           }
         }
 
-        const float32Array = new Float32Array(
-          resizedImageData.width * resizedImageData.height
-        );
-
-        for (let i = 0; i < float32Array.length; i++) {
-          float32Array[i] = resizedImageData.data[i * 4 + 3] * 1.0;
-        }
-
-        const res = predict(w1, b1, w2, b2, w3, b3, float32Array);
+        const res = predict(w1, b1, w2, b2, w3, b3, resizedImage);
         document.getElementById("result").innerText = "result: " + res;
-        console.log(w1);
       }
 
       function draw(x, y) {
@@ -101,7 +87,7 @@
         }
         context.lineCap = "round";
         context.lineJoin = "round";
-        context.lineWidth = 50;
+        context.lineWidth = 30;
         context.strokeStyle = "black";
 
         if (lastPosition.x === null || lastPosition.y === null) {

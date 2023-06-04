@@ -5,21 +5,28 @@ pub mod matrix;
 pub mod network;
 pub mod relu;
 
+use crate::dense::Dense;
+use crate::matrix::argmax;
+use crate::network::Network;
+use crate::relu::Relu;
 use matrix::Matrix;
 use wasm_bindgen::prelude::*;
-use crate::network::Network;
-use crate::dense::Dense;
-use crate::relu::Relu;
-use crate::matrix::argmax;
-
 
 #[wasm_bindgen]
-extern {
+extern "C" {
     pub fn alert(s: &str);
 }
 
 #[wasm_bindgen]
-pub fn predict(w1: Vec<f32>, b1: Vec<f32>, w2: Vec<f32>, b2: Vec<f32>, w3: Vec<f32>, b3: Vec<f32>, inputs: Vec<f32>) -> usize {
+pub fn predict(
+    w1: Vec<f32>,
+    b1: Vec<f32>,
+    w2: Vec<f32>,
+    b2: Vec<f32>,
+    w3: Vec<f32>,
+    b3: Vec<f32>,
+    inputs: Vec<f32>,
+) -> usize {
     const LR: f32 = 0.001;
     let mut dense1 = Dense::new(28 * 28, 100, LR, "0".to_string());
     copy(&mut dense1.weights, &w1);
@@ -52,7 +59,7 @@ fn copy(x: &mut Matrix, y: &Vec<f32>) {
     let c = x[0].len();
     for i in 0..r {
         for j in 0..c {
-            x[i][j] = y[i*c + j];
+            x[i][j] = y[i * c + j];
         }
     }
 }
