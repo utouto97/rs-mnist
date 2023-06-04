@@ -1,4 +1,4 @@
-use crate::Matrix;
+use crate::matrix::Matrix;
 
 pub fn softmax_cross_entropy(x: &Matrix, t: &Vec<usize>) -> f32 {
     let n = x.len() as f32;

@@ -1,4 +1,5 @@
-use crate::{addbias, load_matrix, matadd, matmul, save_matrix, scalar, transpose, Layer, Matrix};
+use crate::layer::Layer;
+use crate::matrix::{addbias, load_matrix, matadd, matmul, save_matrix, scalar, transpose, Matrix};
 use rand::prelude::{thread_rng, Distribution};
 use rand_distr::Normal;
 

@@ -1,18 +1,10 @@
-mod dense;
-mod layer;
-mod loss;
-mod matrix;
-mod network;
-mod relu;
+extern crate rs_mnist;
 
-use crate::dense::Dense;
-use crate::layer::Layer;
-use crate::loss::{grad_softmax_cross_entropy, softmax_cross_entropy};
-use crate::matrix::{
-    addbias, argmax, load_matrix, matadd, matmul, save_matrix, scalar, transpose, Matrix,
-};
-use crate::network::Network;
-use crate::relu::Relu;
+use rs_mnist::dense::Dense;
+use rs_mnist::loss::{grad_softmax_cross_entropy, softmax_cross_entropy};
+use rs_mnist::matrix::{argmax, Matrix};
+use rs_mnist::network::Network;
+use rs_mnist::relu::Relu;
 
 use std::fs::File;
 use std::io::Read;
@@ -53,14 +45,14 @@ fn main() {
             stdout().flush().unwrap();
         }
         println!();
-        println!("loss {:4.4}", total_loss / iters as f32);
-        println!("acc  {:4.4}", acc / iters as f32);
+        println!("train loss {:4.4}", total_loss / iters as f32);
+        println!("train acc  {:4.4}", acc / iters as f32);
 
         {
             let out = network.forward(&x_test);
             let preds = argmax(&out);
             let acc = accuracy(&preds, &y_test);
-            println!("acc  {:4.4}", acc);
+            println!("test  acc  {:4.4}", acc);
         }
     }
 

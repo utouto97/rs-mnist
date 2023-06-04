@@ -1,4 +1,5 @@
-use crate::{Layer, Matrix};
+use crate::layer::Layer;
+use crate::matrix::Matrix;
 
 pub struct Network {
     layers: Vec<Box<dyn Layer>>,

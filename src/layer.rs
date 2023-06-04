@@ -1,4 +1,4 @@
-use crate::Matrix;
+use crate::matrix::Matrix;
 
 pub trait Layer {
     fn forward(&self, x: &Matrix) -> Matrix;
