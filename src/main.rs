@@ -21,16 +21,16 @@ use std::io::{stdout, Write};
 use rand::Rng;
 
 fn main() {
-    const LR: f32 = 0.01;
+    const LR: f32 = 0.001;
     const BATCH_SIZE: usize = 5000;
     const EPOCHS: usize = 10;
 
     let mut network = Network::new();
     network.add_layer(Box::new(Dense::new(28 * 28, 100, LR, "0".to_string())));
     network.add_layer(Box::new(Relu::new()));
-    // network.add_layer(Box::new(Dense::new(100, 200, LR, "1".to_string())));
-    // network.add_layer(Box::new(Relu::new()));
-    network.add_layer(Box::new(Dense::new(100, 10, LR, "2".to_string())));
+    network.add_layer(Box::new(Dense::new(100, 200, LR, "1".to_string())));
+    network.add_layer(Box::new(Relu::new()));
+    network.add_layer(Box::new(Dense::new(200, 10, LR, "2".to_string())));
 
     let (mut x_train, mut y_train) = load_datasets(true);
     shuffle(&mut x_train, &mut y_train);
@@ -43,9 +43,9 @@ fn main() {
         for (_i, (x, y)) in BatchIter::new(&x_train, &y_train, BATCH_SIZE).enumerate() {
             let out = network.forward(&x);
             let loss = softmax_cross_entropy(&out, &y);
+
             let gy = grad_softmax_cross_entropy(&out, &y);
             network.backward(&gy);
-
             total_loss += loss;
             let preds = argmax(&out);
             acc += accuracy(&preds, &y);
@@ -148,7 +148,7 @@ fn load_datasets(train: bool) -> (Matrix, Vec<usize>) {
 
     let normalized_images = images_u8
         .into_iter()
-        .map(|e| (e as f32) / 255.0)
+        .map(|e| (e as f32))
         .collect::<Vec<_>>();
     let n = normalized_images.len() / (28 * 28);
     let mut images: Matrix = vec![];
