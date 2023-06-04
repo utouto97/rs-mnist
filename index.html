@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="utf-8" />
+    <title>hello-wasm example</title>
+  </head>
+  <body>
+    <canvas
+      id="cnvs"
+      width="400px"
+      height="400px"
+      style="border: 1px solid #000000"
+    ></canvas>
+    <button id="send">send</button>
+    <button id="clear">clear</button>
+    <div id="result"></div>
+    <script type="module">
+      import init, { predict } from "./pkg/rs_mnist.js";
+      init();
+
+      const w1 = new Float32Array(
+        await (await fetch("params/0.weights.bin")).arrayBuffer()
+      );
+      const b1 = new Float32Array(
+        await (await fetch("params/0.bias.bin")).arrayBuffer()
+      );
+      const w2 = new Float32Array(
+        await (await fetch("params/1.weights.bin")).arrayBuffer()
+      );
+      const b2 = new Float32Array(
+        await (await fetch("params/1.bias.bin")).arrayBuffer()
+      );
+      const w3 = new Float32Array(
+        await (await fetch("params/2.weights.bin")).arrayBuffer()
+      );
+      const b3 = new Float32Array(
+        await (await fetch("params/2.bias.bin")).arrayBuffer()
+      );
+
+      const canvas = document.getElementById("cnvs");
+      const context = canvas.getContext("2d");
+      const lastPosition = { x: null, y: null };
+      let isDrag = false;
+
+      function send() {
+        const imageData = context.getImageData(
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
+
+        const resizedImageData = new ImageData(28, 28);
+        const scaleWidth = imageData.width / resizedImageData.width;
+        const scaleHeight = imageData.height / resizedImageData.height;
+
+        for (let y = 0; y < resizedImageData.height; y++) {
+          for (let x = 0; x < resizedImageData.width; x++) {
+            const startX = Math.floor(x * scaleWidth);
+            const startY = Math.floor(y * scaleHeight);
+            const endX = Math.floor((x + 1) * scaleWidth);
+            const endY = Math.floor((y + 1) * scaleHeight);
+
+            let maxGray = 0;
+
+            for (let j = startY; j < endY; j++) {
+              for (let i = startX; i < endX; i++) {
+                const index = (j * imageData.width + i) * 4;
+                const gray = imageData.data[index + 3];
+
+                if (gray > maxGray) {
+                  maxGray = gray;
+                }
+              }
+            }
+
+            const resizedIndex = (y * resizedImageData.width + x) * 4;
+            resizedImageData.data[resizedIndex] = 0;
+            resizedImageData.data[resizedIndex + 1] = 0;
+            resizedImageData.data[resizedIndex + 2] = 0;
+            resizedImageData.data[resizedIndex + 3] = maxGray;
+          }
+        }
+
+        const float32Array = new Float32Array(
+          resizedImageData.width * resizedImageData.height
+        );
+
+        for (let i = 0; i < float32Array.length; i++) {
+          float32Array[i] = resizedImageData.data[i * 4 + 3] * 1.0;
+        }
+
+        const res = predict(w1, b1, w2, b2, w3, b3, float32Array);
+        document.getElementById("result").innerText = "result: " + res;
+        console.log(w1);
+      }
+
+      function draw(x, y) {
+        if (!isDrag) {
+          return;
+        }
+        context.lineCap = "round";
+        context.lineJoin = "round";
+        context.lineWidth = 50;
+        context.strokeStyle = "black";
+
+        if (lastPosition.x === null || lastPosition.y === null) {
+          context.moveTo(x, y);
+        } else {
+          context.moveTo(lastPosition.x, lastPosition.y);
+        }
+        context.lineTo(x, y);
+        context.stroke();
+        lastPosition.x = x;
+        lastPosition.y = y;
+      }
+
+      function clear() {
+        context.clearRect(0, 0, canvas.width, canvas.height);
+      }
+
+      function dragStart(event) {
+        context.beginPath();
+        isDrag = true;
+      }
+
+      function dragEnd(event) {
+        context.closePath();
+        isDrag = false;
+        lastPosition.x = null;
+        lastPosition.y = null;
+      }
+
+      function initEventHandler() {
+        document.getElementById("send").addEventListener("click", send);
+        document.getElementById("clear").addEventListener("click", clear);
+        canvas.addEventListener("mousedown", dragStart);
+        canvas.addEventListener("mouseup", dragEnd);
+        canvas.addEventListener("mouseout", dragEnd);
+        canvas.addEventListener("mousemove", (event) => {
+          draw(event.layerX, event.layerY);
+        });
+      }
+      initEventHandler();
+    </script>
+  </body>
+</html>
